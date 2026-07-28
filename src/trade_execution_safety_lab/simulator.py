@@ -8,6 +8,7 @@ from enum import StrEnum
 
 from .adapters import VenueError, VenueErrorCategory
 from .models import (
+    OFFLINE_SIMULATION_PROFILE,
     Fill,
     OrderIntent,
     OrderSnapshot,
@@ -107,6 +108,7 @@ class SimulatedVenue:
     """A single-process venue with explicit scripted state transitions."""
 
     name = "deterministic-simulated-venue"
+    safety_profile = OFFLINE_SIMULATION_PROFILE
 
     def __init__(
         self,
@@ -135,6 +137,10 @@ class SimulatedVenue:
         self.submit_count = 0
         self.cancel_count = 0
         self.poll_count = 0
+
+    @property
+    def network_used(self) -> bool:
+        return False
 
     def submit(self, intent: OrderIntent) -> OrderSnapshot:
         existing = self.find_by_client_order_id(intent.client_order_id)

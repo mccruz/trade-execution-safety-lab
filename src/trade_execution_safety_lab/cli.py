@@ -1,12 +1,13 @@
-"""Command-line interface for the offline execution-safety lab."""
+"""Command-line interface for the offline-first execution-safety lab."""
 
 from __future__ import annotations
 
 import argparse
 import json
-from pathlib import Path
 import sys
+from pathlib import Path
 
+from .connectors import connector_catalog
 from .receipts import verify_receipt_payload
 from .scenarios import run_demo, scenario_catalog, scenario_names
 
@@ -15,8 +16,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="trade-safety-lab",
         description=(
-            "Run deterministic broker/exchange execution-safety simulations. "
-            "No network access or credentials are used."
+            "Run credential-free execution-safety simulations or inspect the "
+            "optional Testnet connector boundary."
         ),
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -45,6 +46,10 @@ def build_parser() -> argparse.ArgumentParser:
         "list-scenarios",
         help="List the deterministic scenarios without running them.",
     )
+    subparsers.add_parser(
+        "list-connectors",
+        help="Describe connector boundaries without credentials or network access.",
+    )
 
     verify = subparsers.add_parser(
         "verify-receipt",
@@ -62,6 +67,21 @@ def main(argv: list[str] | None = None) -> int:
                 print(
                     f"{scenario['name']}: {scenario['description']} "
                     f"(expected: {scenario['expected_outcome']})"
+                )
+            return 0
+
+        if args.command == "list-connectors":
+            for connector in connector_catalog():
+                requirements = [
+                    "network" if connector["network_permitted"] else "network disabled",
+                    "credentials required"
+                    if connector["credentials_required"]
+                    else "no credentials",
+                    "no live trading",
+                ]
+                print(
+                    f"{connector['name']}: {connector['availability']}; "
+                    f"{', '.join(requirements)}; {connector['detail']}."
                 )
             return 0
 

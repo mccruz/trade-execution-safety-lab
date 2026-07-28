@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from decimal import Decimal
-import unittest
 
 from trade_execution_safety_lab.adapters import VenueError, VenueErrorCategory
 from trade_execution_safety_lab.engine import ExecutionPolicy
@@ -61,6 +61,11 @@ class LookupFailureVenue(SimulatedVenue):
             category=VenueErrorCategory.TRANSIENT,
             retryable=True,
         )
+
+
+class MismatchedSubmitVenue(SimulatedVenue):
+    def submit(self, intent):
+        return replace(super().submit(intent), client_order_id="OTHER-ORDER")
 
 
 class EngineTests(StoreTestCase):
@@ -171,6 +176,15 @@ class EngineTests(StoreTestCase):
         self.assertEqual(venue.submit_count, 0)
         self.assertIn("submit-unconfirmed", receipt.reason_codes)
 
+    def test_engine_automatically_conformance_checks_submission(self) -> None:
+        venue = MismatchedSubmitVenue()
+        engine, venue = self.make_engine(venue=venue)
+        receipt = engine.execute(make_intent(), scenario="malformed-acknowledgement")
+        self.assertEqual(receipt.outcome, ReceiptOutcome.VENUE_DEFERRED)
+        self.assertIn("submit-unconfirmed", receipt.reason_codes)
+        self.assertIn("protocol", receipt.reason_codes)
+        self.assertEqual(venue.submit_count, 1)
+
     def test_preflight_position_failure_defers_before_submit(self) -> None:
         venue = PositionFailureVenue()
         engine, venue = self.make_engine(venue=venue)
@@ -224,6 +238,18 @@ class EngineTests(StoreTestCase):
         self.assertEqual(receipt.outcome, ReceiptOutcome.FILLED)
         self.assertEqual(venue.submit_count, 1)
         self.assertIn("order.recovered", [event.kind for event in receipt.events])
+
+    def test_mismatched_recovered_order_blocks_duplicate_submission(self) -> None:
+        venue = SimulatedVenue()
+        venue.submit(make_intent(quantity="1"))
+        engine, venue = self.make_engine(venue=venue)
+        receipt = engine.execute(
+            make_intent(quantity="2"),
+            scenario="mismatched-recovery",
+        )
+        self.assertEqual(receipt.outcome, ReceiptOutcome.VENUE_DEFERRED)
+        self.assertIn("existing-order-intent-mismatch", receipt.reason_codes)
+        self.assertEqual(venue.submit_count, 1)
 
     def test_repeated_execute_returns_same_receipt(self) -> None:
         engine, venue = self.make_engine(

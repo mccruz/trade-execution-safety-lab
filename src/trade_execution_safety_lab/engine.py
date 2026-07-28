@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Mapping
 
 from .adapters import ExecutionVenue, VenueError
+from .conformance import ConformingVenue, order_snapshot_issues
 from .models import (
     ExecutionEvent,
     ExecutionReceipt,
@@ -38,7 +39,7 @@ class ExecutionPolicy:
 
 
 class SafeExecutionEngine:
-    """Execute one synthetic intent while preserving fail-closed invariants."""
+    """Execute one bounded intent while preserving fail-closed invariants."""
 
     def __init__(
         self,
@@ -48,7 +49,11 @@ class SafeExecutionEngine:
         receipt_store: AtomicReceiptStore,
         policy: ExecutionPolicy | None = None,
     ) -> None:
-        self.venue = venue
+        self.venue = (
+            venue if isinstance(venue, ConformingVenue) else ConformingVenue(venue)
+        )
+        if self.venue.safety_profile.live_trading_permitted:
+            raise ValueError("live-trading venues are not supported")
         self.receipt_store = receipt_store
         self.policy = policy or ExecutionPolicy()
         self._expected_positions = expected_positions_copy(expected_positions or {})
@@ -66,7 +71,7 @@ class SafeExecutionEngine:
             return completed
 
         events: list[ExecutionEvent] = []
-        self._append_event(events, "intent.received", "Synthetic order intent received.")
+        self._append_event(events, "intent.received", "Bounded order intent received.")
 
         issues = validate_order(intent)
         if issues:
@@ -150,6 +155,22 @@ class SafeExecutionEngine:
                 events=events,
             )
         if order is not None:
+            if order_snapshot_issues(order, expected_intent=intent):
+                self._append_event(
+                    events,
+                    "order.lookup-deferred",
+                    "Recovered venue order did not match the requested intent.",
+                )
+                return self._finish(
+                    scenario=scenario,
+                    intent=intent,
+                    outcome=ReceiptOutcome.VENUE_DEFERRED,
+                    reason_codes=("existing-order-intent-mismatch",),
+                    order=order,
+                    preflight=preflight,
+                    postflight=None,
+                    events=events,
+                )
             self._append_event(
                 events,
                 "order.recovered",
@@ -363,13 +384,13 @@ class SafeExecutionEngine:
             events,
             "decision.recorded",
             (
-                "Synthetic workflow may continue."
+                "Bounded workflow may continue."
                 if next_action_authorized
                 else "Automatic continuation is not authorized."
             ),
         )
         draft = ExecutionReceipt(
-            schema_version=1,
+            schema_version=2,
             receipt_id="",
             scenario=scenario,
             intent=intent,
@@ -380,6 +401,8 @@ class SafeExecutionEngine:
             preflight=preflight,
             postflight=postflight,
             events=tuple(events),
+            safety_profile=self.venue.safety_profile,
+            network_used=self.venue.network_used,
         )
         receipt = finalize_receipt(draft)
         self.receipt_store.write(receipt)

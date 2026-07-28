@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
+import re
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from decimal import Decimal
 from enum import StrEnum
-import re
-from typing import Any, Mapping
-
+from typing import Any
 
 _SAFE_IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 _SAFE_SYMBOL = re.compile(r"^[A-Z][A-Z0-9-]{2,31}$")
+_SAFE_PROFILE_VALUE = re.compile(r"^[a-z][a-z0-9-]{1,31}$")
 
 
 def decimal_text(value: Decimal) -> str:
@@ -70,6 +71,46 @@ class ReconciliationStatus(StrEnum):
 
 
 @dataclass(frozen=True)
+class VenueSafetyProfile:
+    """Non-secret execution boundary recorded with every receipt."""
+
+    mode: str
+    provider: str
+    environment: str
+    network_permitted: bool
+    credentials_required: bool
+    live_trading_permitted: bool = False
+
+    def __post_init__(self) -> None:
+        for name in ("mode", "provider", "environment"):
+            if not _SAFE_PROFILE_VALUE.fullmatch(getattr(self, name)):
+                raise ValueError(f"{name} must be a safe lowercase identifier")
+        if self.credentials_required and not self.network_permitted:
+            raise ValueError("credentialed venues must permit network access")
+        if self.live_trading_permitted:
+            raise ValueError("live-trading venues are outside this project's scope")
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "mode": self.mode,
+            "provider": self.provider,
+            "environment": self.environment,
+            "network_permitted": self.network_permitted,
+            "credentials_required": self.credentials_required,
+            "live_trading_permitted": self.live_trading_permitted,
+        }
+
+
+OFFLINE_SIMULATION_PROFILE = VenueSafetyProfile(
+    mode="offline-simulation",
+    provider="simulated",
+    environment="local",
+    network_permitted=False,
+    credentials_required=False,
+)
+
+
+@dataclass(frozen=True)
 class Instrument:
     symbol: str
     price_tick: Decimal
@@ -79,14 +120,15 @@ class Instrument:
 
     def __post_init__(self) -> None:
         if not _SAFE_SYMBOL.fullmatch(self.symbol):
-            raise ValueError("instrument symbol must be an uppercase synthetic-safe identifier")
+            raise ValueError("instrument symbol must be an uppercase safe identifier")
         for name in (
             "price_tick",
             "quantity_step",
             "minimum_quantity",
             "minimum_notional",
         ):
-            if getattr(self, name) <= 0:
+            value = getattr(self, name)
+            if not value.is_finite() or value <= 0:
                 raise ValueError(f"{name} must be positive")
 
     def to_dict(self) -> dict[str, str]:
@@ -112,6 +154,10 @@ class OrderIntent:
     def __post_init__(self) -> None:
         if not _SAFE_IDENTIFIER.fullmatch(self.client_order_id):
             raise ValueError("client_order_id must be a safe 1-64 character identifier")
+        for name in ("quantity", "limit_price", "reference_price"):
+            value = getattr(self, name)
+            if value is not None and not value.is_finite():
+                raise ValueError(f"{name} must be finite")
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -142,12 +188,12 @@ class Fill:
     def __post_init__(self) -> None:
         if not _SAFE_IDENTIFIER.fullmatch(self.fill_id):
             raise ValueError("fill_id must be a safe identifier")
-        if self.quantity <= 0:
+        if not self.quantity.is_finite() or self.quantity <= 0:
             raise ValueError("fill quantity must be positive")
-        if self.price <= 0:
+        if not self.price.is_finite() or self.price <= 0:
             raise ValueError("fill price must be positive")
-        if self.fee < 0:
-            raise ValueError("fill fee cannot be negative")
+        if not self.fee.is_finite():
+            raise ValueError("fill fee must be finite")
         if self.sequence < 1:
             raise ValueError("fill sequence must be positive")
 
@@ -173,6 +219,16 @@ class OrderSnapshot:
     fills: tuple[Fill, ...] = ()
     reason: str | None = None
     sequence: int = 1
+
+    def __post_init__(self) -> None:
+        if not _SAFE_IDENTIFIER.fullmatch(self.venue_order_id):
+            raise ValueError("venue_order_id must be a safe identifier")
+        if not _SAFE_IDENTIFIER.fullmatch(self.client_order_id):
+            raise ValueError("client_order_id must be a safe identifier")
+        if not self.requested_quantity.is_finite() or self.requested_quantity <= 0:
+            raise ValueError("requested quantity must be positive")
+        if self.sequence < 1:
+            raise ValueError("order sequence must be positive")
 
     @property
     def filled_quantity(self) -> Decimal:
@@ -227,8 +283,12 @@ class PositionSnapshot:
 
     def __post_init__(self) -> None:
         if not _SAFE_SYMBOL.fullmatch(self.symbol):
-            raise ValueError("position symbol must be an uppercase synthetic-safe identifier")
-        if self.average_price is not None and self.average_price < 0:
+            raise ValueError("position symbol must be an uppercase safe identifier")
+        if not self.quantity.is_finite():
+            raise ValueError("position quantity must be finite")
+        if self.average_price is not None and (
+            not self.average_price.is_finite() or self.average_price < 0
+        ):
             raise ValueError("average price cannot be negative")
         if self.sequence < 0:
             raise ValueError("position sequence cannot be negative")
@@ -323,15 +383,23 @@ class ExecutionReceipt:
     preflight: ReconciliationReport | None
     postflight: ReconciliationReport | None
     events: tuple[ExecutionEvent, ...] = field(default_factory=tuple)
-    mode: str = "offline-simulation"
+    safety_profile: VenueSafetyProfile = OFFLINE_SIMULATION_PROFILE
+    network_used: bool = False
+
+    def __post_init__(self) -> None:
+        if self.schema_version < 1:
+            raise ValueError("receipt schema_version must be positive")
+        if self.network_used and not self.safety_profile.network_permitted:
+            raise ValueError(
+                "network use cannot be recorded for a network-disabled venue"
+            )
 
     def to_dict(self, *, include_receipt_id: bool = True) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "schema_version": self.schema_version,
             "scenario": self.scenario,
-            "mode": self.mode,
-            "network_used": False,
-            "credentials_required": False,
+            **self.safety_profile.to_dict(),
+            "network_used": self.network_used,
             "intent": self.intent.to_dict(),
             "outcome": self.outcome.value,
             "next_action_authorized": self.next_action_authorized,
