@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  unit-tests:
+    name: unit-tests (${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install the local package
+        run: python -m pip install --no-deps .
+      - name: Compile source and tests
+        run: python -m compileall -q src tests
+      - name: Run unit tests
+        run: python -m unittest discover -s tests -v
+
+  offline-demo:
+    name: offline-demo
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+      - name: Install the local package
+        run: python -m pip install --no-deps .
+      - name: Run the credential-free demo
+        run: trade-safety-lab demo --output-dir demo-output --reset
+      - name: Verify offline evidence and receipts
+        shell: python
+        run: |
+          import json
+          from pathlib import Path
+          from trade_execution_safety_lab.receipts import verify_receipt_payload
+
+          root = Path("demo-output")
+          summary = json.loads((root / "summary.json").read_text())
+          assert summary["passed"] is True
+          assert summary["network_used"] is False
+          assert summary["credentials_required"] is False
+          assert summary["scenario_count"] == 8
+          for scenario in summary["scenarios"]:
+              payload = json.loads((root / scenario["receipt"]).read_text())
+              assert verify_receipt_payload(payload)
