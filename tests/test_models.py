@@ -34,6 +34,10 @@ class ModelTests(unittest.TestCase):
                 minimum_notional=Decimal("10"),
             )
 
+    def test_instrument_constraints_must_be_finite(self) -> None:
+        with self.assertRaises(ValueError):
+            replace(INSTRUMENT, price_tick=Decimal("NaN"))
+
     def test_order_intent_rejects_unsafe_identifier(self) -> None:
         with self.assertRaises(ValueError):
             make_intent("../unsafe")
@@ -41,6 +45,27 @@ class ModelTests(unittest.TestCase):
     def test_fill_rejects_non_positive_quantity(self) -> None:
         with self.assertRaises(ValueError):
             Fill("FILL-1", Decimal("0"), Decimal("25"), Decimal("0"), 1)
+
+    def test_fill_rejects_nonfinite_values(self) -> None:
+        with self.assertRaises(ValueError):
+            Fill("FILL-1", Decimal("NaN"), Decimal("25"), Decimal("0"), 1)
+
+    def test_fill_preserves_signed_fee_for_rebates(self) -> None:
+        fill = Fill("FILL-1", Decimal("1"), Decimal("25"), Decimal("-0.01"), 1)
+        self.assertEqual(fill.fee, Decimal("-0.01"))
+
+    def test_order_snapshot_rejects_unsafe_identifiers(self) -> None:
+        intent = make_intent()
+        with self.assertRaises(ValueError):
+            OrderSnapshot(
+                venue_order_id="../unsafe",
+                client_order_id=intent.client_order_id,
+                instrument=intent.instrument,
+                side=intent.side,
+                order_type=intent.order_type,
+                requested_quantity=intent.quantity,
+                status=OrderStatus.ACCEPTED,
+            )
 
     def test_order_snapshot_calculates_weighted_price_and_fee(self) -> None:
         intent = make_intent(quantity="3")

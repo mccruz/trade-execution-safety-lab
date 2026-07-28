@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1440" height="760" viewBox="0 0 1440 760" role="img" aria-labelledby="title desc">
   <title id="title">Trade execution safety architecture</title>
-  <desc id="desc">A synthetic order passes through validation, preflight position reconciliation, idempotent submission, bounded observation and cancellation, postflight reconciliation, and a checksummed receipt. Only a filled and reconciled order may continue; blocked and uncertain outcomes require human review.</desc>
+  <desc id="desc">A bounded order passes through validation, preflight position reconciliation, adapter conformance and idempotent submission, bounded observation and cancellation, postflight reconciliation, and a checksummed receipt. The default venue is an offline simulator and an optional adapter is restricted to Bybit Testnet. Only a filled and reconciled order may continue; blocked and uncertain outcomes require human review.</desc>
   <defs>
     <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#071525"/>
@@ -16,8 +16,8 @@
 
   <rect width="1440" height="760" rx="28" fill="url(#background)"/>
 
-  <text x="64" y="76" fill="#f6f9fc" font-family="Inter, Arial, sans-serif" font-size="42" font-weight="700">Offline execution-safety workflow</text>
-  <text x="64" y="116" fill="#a9bed2" font-family="Inter, Arial, sans-serif" font-size="22">Synthetic data · deterministic venue · no credentials · no network</text>
+  <text x="64" y="76" fill="#f6f9fc" font-family="Inter, Arial, sans-serif" font-size="42" font-weight="700">Offline-first execution-safety workflow</text>
+  <text x="64" y="116" fill="#a9bed2" font-family="Inter, Arial, sans-serif" font-size="22">Default simulator · optional Bybit Testnet adapter · no live trading</text>
 
   <rect x="64" y="150" width="1312" height="52" rx="18" fill="#0d2237" stroke="#2a5270"/>
   <text x="720" y="183" text-anchor="middle" fill="#c9d9e8" font-family="Inter, Arial, sans-serif" font-size="18">Proceed to the next control only when the current evidence is safe.</text>
@@ -28,7 +28,7 @@
     <path d="M 670 330 H 714"/>
     <path d="M 890 330 H 934"/>
     <path d="M 1110 330 H 1154"/>
-    <path d="M 1250 410 V 468 H 980 V 590 H 950"/>
+    <path d="M 1250 410 V 468 H 800 V 520"/>
     <path d="M 650 590 H 590"/>
     <path d="M 950 590 H 1050"/>
   </g>
@@ -37,8 +37,8 @@
     <g>
       <rect x="50" y="260" width="180" height="150" rx="22" fill="#123f61" stroke="#3b91c4" stroke-width="3"/>
       <circle cx="140" cy="295" r="11" fill="#57e3b3"/>
-      <text x="140" y="338" text-anchor="middle" fill="#ffffff" font-size="21" font-weight="700">Synthetic intent</text>
-      <text x="140" y="371" text-anchor="middle" fill="#c4d8e8" font-size="18">DEMO-USD only</text>
+      <text x="140" y="338" text-anchor="middle" fill="#ffffff" font-size="21" font-weight="700">Bounded intent</text>
+      <text x="140" y="371" text-anchor="middle" fill="#c4d8e8" font-size="18">Synthetic by default</text>
     </g>
     <g>
       <rect x="270" y="260" width="180" height="150" rx="22" fill="#123f61" stroke="#3b91c4" stroke-width="3"/>
@@ -54,9 +54,9 @@
     </g>
     <g>
       <rect x="710" y="260" width="180" height="150" rx="22" fill="#123f61" stroke="#3b91c4" stroke-width="3"/>
-      <text x="800" y="318" text-anchor="middle" fill="#ffffff" font-size="24" font-weight="700">Submit once</text>
-      <text x="800" y="352" text-anchor="middle" fill="#c4d8e8" font-size="18">Idempotent</text>
-      <text x="800" y="380" text-anchor="middle" fill="#c4d8e8" font-size="18">client order ID</text>
+      <text x="800" y="312" text-anchor="middle" fill="#ffffff" font-size="22" font-weight="700">Conformance</text>
+      <text x="800" y="341" text-anchor="middle" fill="#ffffff" font-size="22" font-weight="700">+ submit once</text>
+      <text x="800" y="377" text-anchor="middle" fill="#c4d8e8" font-size="18">Idempotent client ID</text>
     </g>
     <g>
       <rect x="930" y="260" width="180" height="150" rx="22" fill="#123f61" stroke="#3b91c4" stroke-width="3"/>
@@ -89,7 +89,7 @@
       <rect x="1050" y="520" width="300" height="140" rx="24" fill="#123f37" stroke="#57e3b3" stroke-width="3"/>
       <text x="1200" y="574" text-anchor="middle" fill="#e8fff7" font-size="26" font-weight="700">Continue safely</text>
       <text x="1200" y="608" text-anchor="middle" fill="#bdebdc" font-size="18">Filled + reconciled</text>
-      <text x="1200" y="636" text-anchor="middle" fill="#bdebdc" font-size="18">Synthetic workflow only</text>
+      <text x="1200" y="636" text-anchor="middle" fill="#bdebdc" font-size="18">Authorized workflow</text>
     </g>
   </g>
 

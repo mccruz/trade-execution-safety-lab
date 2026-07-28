@@ -62,3 +62,39 @@ jobs:
           for scenario in summary["scenarios"]:
               payload = json.loads((root / scenario["receipt"]).read_text())
               assert verify_receipt_payload(payload)
+
+  optional-connector:
+    name: optional-connector
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.14"
+      - name: Install the optional Testnet SDK
+        run: python -m pip install '.[bybit-testnet]'
+      - name: Verify dependency consistency
+        run: python -m pip check
+      - name: Verify the fixed endpoint without a network request
+        shell: python
+        run: |
+          from importlib.metadata import version
+          from pybit.unified_trading import HTTP
+
+          client = HTTP(
+              testnet=True,
+              demo=False,
+              api_key="example-only",
+              api_secret="example-only",
+              log_requests=False,
+              force_retry=False,
+              max_retries=1,
+              retry_codes={0},
+          )
+          assert version("pybit") == "5.17.0"
+          assert client.endpoint == "https://api-testnet.bybit.com"
+      - name: Run credential-free connector contract tests
+        run: python -m unittest discover -s tests -v

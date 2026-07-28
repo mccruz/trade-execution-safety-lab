@@ -1,27 +1,30 @@
 # Trade Execution Safety Lab
 
-Trade Execution Safety Lab is an offline Python case study for reliable broker and
-exchange automation. It demonstrates guarded order submission, cancellation-race
-handling, partial-fill accounting, position reconciliation, restart recovery, and
-tamper-evident evidence—without a trading strategy, live account, credentials, or
-network access.
+Trade Execution Safety Lab is an offline-first Python case study for reliable
+broker and exchange automation. It combines a deterministic failure simulator,
+a reusable adapter-conformance layer, and an optional Bybit Testnet reference
+adapter built on the official SDK.
 
-![Architecture of the offline trade execution safety workflow](assets/architecture.svg)
+The project demonstrates guarded order submission, cancellation-race handling,
+partial-fill accounting, position reconciliation, restart recovery, and
+tamper-evident evidence. It contains no trading strategy, production
+configuration, live account details, performance claims, or mainnet path.
+
+![Architecture of the offline-first trade execution safety workflow](assets/architecture.svg)
 
 ## Three-minute recruiter review — no setup required
 
-This project is designed to be understandable before anyone runs code:
+No account, installation, or technical background is needed for this review:
 
-1. Scan the [eight failure and recovery scenarios](docs/scenarios.md).
+1. Scan the [eight plain-language failure and recovery scenarios](docs/scenarios.md).
 2. Follow the [execution and evidence architecture](docs/architecture.md).
-3. Review the fail-closed orchestration in
-   [`engine.py`](src/trade_execution_safety_lab/engine.py) and the deterministic
-   venue in [`simulator.py`](src/trade_execution_safety_lab/simulator.py).
-4. See how the [88 unit tests](tests/) cover business-critical edge cases.
+3. Compare the [provider-neutral conformance controls](docs/connector-conformance.md)
+   with the [Bybit Testnet adapter boundary](docs/connectors/bybit-testnet.md).
+4. See how the [128 unit tests](tests/) cover business-critical edge cases.
 
-The key outcome is not a trading result. It is evidence that an automated system
-can refuse unsafe work, recognize uncertain order state, reconcile against the
-venue, and route exceptions to a human.
+The outcome is not a trading result. It is evidence that an automated system can
+refuse unsafe work, detect inconsistent provider data, reconcile against a
+source of truth, and route uncertainty to a human.
 
 ## What the implementation proves
 
@@ -33,26 +36,45 @@ venue, and route exceptions to a human.
 | Partial fills | Weighted fills, fees, exposure update, and manual deferral | `partial-fill-cancel` |
 | Fill/cancel race | Final venue state wins over the cancellation request | `cancel-fill-race` |
 | Cancellation never resolves | Bounded observation and fail-closed outcome | `unresolved-cancel` |
-| Rejection or connection interruption | Typed outcomes with no automatic retry authorization | `rejected-order`, `transient-disconnect` |
+| Malformed or contradictory provider data | Reusable snapshot and transition conformance checks | Adapter contract tests |
+| Wrong environment or account mode | Fixed Testnet endpoint and one-way-position enforcement | Bybit boundary tests |
+| Rejection, rate limit, or interruption | Typed, redacted errors with no adapter-level retry | Error-mapping tests |
 | Evidence tampering | Canonical SHA-256 receipts written atomically | Receipt verification tests |
 
-## Safety boundary
+## Two deliberately separate modes
 
-Version 1.0 is a simulator-only engineering lab:
+### Default: offline simulator
 
-- No broker or exchange SDK is installed.
-- No HTTP, WebSocket, or other network client exists.
-- No API key, account identifier, environment-variable credential, or endpoint is
-  accepted.
-- `DEMO-USD` and every order, fill, fee, position, and error are synthetic.
-- The alternating toy signal uses only a fixture index; it contains no economic
-  or strategy logic.
-- Only a fully filled, postflight-reconciled synthetic order authorizes the demo
-  workflow to continue. All uncertain states stop.
+- Built in, credential-free, and network-disabled.
+- Uses only fictional `DEMO-USD` orders, fills, positions, fees, and errors.
+- Runs the full recruiter demo and every CI check.
+- Contains a deliberately non-economic toy signal and no strategy logic.
 
-Real paper-account or testnet adapters, if added later, will be isolated,
-opt-in, disabled in CI, and released only after a separate security, licensing,
-and privacy review.
+### Optional: Bybit Testnet reference adapter
+
+- Uses the official
+  [`pybit` 5.17.0 package](https://pypi.org/project/pybit/5.17.0/) as the
+  transport SDK; it does not reimplement Bybit authentication or HTTP.
+- Adds a safety layer the SDK does not provide: provider-neutral models,
+  bounded pagination, idempotency checks, state-transition validation,
+  reconciliation, typed evidence, and human-review outcomes.
+- Accepts only the fixed Bybit Testnet endpoint, linear products, and one-way
+  position mode. There is no mainnet endpoint option or live-trading profile.
+- Reads optional Testnet credentials from two named environment variables.
+  Real values are never committed or included in exceptions or receipts; tests
+  use explicit non-secret placeholders.
+- Is contract-tested with an injected fake SDK client. CI never contacts Bybit
+  and never needs a secret.
+
+This is actual adapter code, not a placeholder with keys removed. It is also
+intentionally not a turnkey trading bot: the repository supplies no strategy,
+live command, production deployment, or automatic mainnet switch.
+
+Inspect the boundaries without installing the optional SDK:
+
+```bash
+trade-safety-lab list-connectors
+```
 
 ## Run the offline demo
 
@@ -66,8 +88,8 @@ git clone https://github.com/mccruz/trade-execution-safety-lab.git
 cd trade-execution-safety-lab
 ```
 
-The remaining commands must be run from the repository directory—the folder
-containing this README and `pyproject.toml`.
+The remaining commands must be run from the folder containing this README and
+`pyproject.toml`.
 
 ### 2. Create an isolated Python environment
 
@@ -115,13 +137,17 @@ python -m unittest discover -s tests -v
 python -m compileall -q src tests
 ```
 
-The suite currently contains 88 tests. GitHub Actions repeats the tests on
-Python 3.11, 3.12, 3.13, and 3.14 and runs the complete offline demo separately.
+The suite contains 128 tests. GitHub Actions repeats them on Python 3.11, 3.12,
+3.13, and 3.14 and runs the complete offline demo separately. The default jobs
+import the optional connector without installing `pybit`, proving that the base
+package remains isolated. A separate credential-free job installs the pinned
+SDK and checks its Testnet endpoint without sending a provider request.
 
-## Explore one scenario
+## Explore the lab
 
 ```bash
 trade-safety-lab list-scenarios
+trade-safety-lab list-connectors
 trade-safety-lab demo --output-dir demo-output --reset --scenario cancel-fill-race
 ```
 
@@ -129,31 +155,45 @@ If `demo-output` already contains lab evidence, `--reset` removes it only when
 the directory has the lab-owned sentinel. The CLI refuses broad paths,
 symbolic-link targets, and non-lab directories.
 
+Technical reviewers can install the optional connector dependencies with:
+
+```bash
+python -m pip install '.[bybit-testnet]'
+```
+
+Installation does not contact Bybit or place an order. Continue with the
+[Bybit Testnet setup and review guide](docs/connectors/bybit-testnet.md) before
+constructing the connector.
+
 ## Architecture and design notes
 
 - [Architecture and safety invariants](docs/architecture.md)
+- [Connector conformance contract](docs/connector-conformance.md)
+- [Bybit Testnet adapter review](docs/connectors/bybit-testnet.md)
+- [Optional dependency and security review](docs/dependency-review.md)
 - [Scenario catalog and expected decisions](docs/scenarios.md)
 - [Authorship, provenance, and privacy boundary](docs/provenance.md)
 - [Security policy](SECURITY.md)
 - [Contribution guide](CONTRIBUTING.md)
 
-The adapter is a Python
-[`Protocol`](src/trade_execution_safety_lab/adapters.py), so orchestration depends
-on a small provider-neutral contract. Version 1.0 supplies only
-[`SimulatedVenue`](src/trade_execution_safety_lab/simulator.py). That distinction
-is intentional: a simulator is executable adapter code for deterministic
-failure testing, not a live connector with credentials removed.
+The venue boundary is a small Python
+[`Protocol`](src/trade_execution_safety_lab/adapters.py). The same orchestration
+can therefore evaluate the deterministic simulator or an explicitly enabled
+Testnet adapter, while [`ConformingVenue`](src/trade_execution_safety_lab/conformance.py)
+checks normalized data before the engine consumes it.
 
 ## Limitations
 
 - This is not financial advice, a strategy, a backtest, or a production trading
   system.
-- The simulator models selected execution-control risks, not every venue rule,
-  order type, latency condition, or market microstructure behavior.
+- Testnet behavior does not prove production readiness and can differ from
+  mainnet behavior.
+- The authenticated Bybit path is not exercised in public CI. The adapter is
+  verified through deterministic contract tests and optional-dependency checks.
+- The simulator and reference adapter cover selected execution-control risks,
+  not every venue rule, order type, latency condition, or market behavior.
 - Receipts demonstrate local integrity and atomic persistence; they are not
   externally signed or independently timestamped.
-- Recovery plans classify failures but do not sleep, reconnect, or access a
-  network.
 - No performance, profitability, or live-money claim is made.
 
 ## License
@@ -161,4 +201,5 @@ failure testing, not a live connector with credentials removed.
 Code and original documentation are available under the [MIT License](LICENSE).
 The project was newly written as a clean-history public derivative; private
 trading repositories, histories, configurations, data, research, strategies,
-and operational details are excluded. See [provenance](docs/provenance.md).
+parameters, and operational details are excluded. See
+[provenance](docs/provenance.md).

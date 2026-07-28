@@ -5,7 +5,12 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Protocol, runtime_checkable
 
-from .models import OrderIntent, OrderSnapshot, PositionSnapshot
+from .models import (
+    OrderIntent,
+    OrderSnapshot,
+    PositionSnapshot,
+    VenueSafetyProfile,
+)
 
 
 class VenueErrorCategory(StrEnum):
@@ -34,6 +39,11 @@ class VenueError(RuntimeError):
 @runtime_checkable
 class ExecutionVenue(Protocol):
     name: str
+    safety_profile: VenueSafetyProfile
+
+    @property
+    def network_used(self) -> bool:
+        """Whether this venue instance has attempted network access."""
 
     def submit(self, intent: OrderIntent) -> OrderSnapshot:
         """Submit once, keyed by client_order_id."""

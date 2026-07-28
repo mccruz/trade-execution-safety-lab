@@ -4,14 +4,16 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "trade-execution-safety-lab"
-version = "1.0.0"
-description = "Offline execution-safety simulations for broker and exchange automation."
+version = "1.1.0"
+description = "Offline-first trade execution safety, conformance checks, and a testnet reference adapter."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "Mark Cruz" }]
 keywords = [
   "ai-automation",
+  "api-integration",
+  "adapter-pattern",
   "broker-simulation",
   "exchange-simulation",
   "execution-safety",
@@ -19,6 +21,7 @@ keywords = [
   "python",
   "reliability-engineering",
   "state-machines",
+  "testnet",
 ]
 classifiers = [
   "Development Status :: 4 - Beta",
@@ -31,6 +34,9 @@ classifiers = [
   "Topic :: Software Development :: Testing",
 ]
 dependencies = []
+
+[project.optional-dependencies]
+bybit-testnet = ["pybit==5.17.0"]
 
 [project.scripts]
 trade-safety-lab = "trade_execution_safety_lab.cli:main"

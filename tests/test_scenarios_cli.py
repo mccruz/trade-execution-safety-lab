@@ -88,6 +88,16 @@ class ScenarioTests(unittest.TestCase):
 
 
 class CliTests(unittest.TestCase):
+    def test_list_connectors_is_offline_and_explains_boundaries(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            status = main(["list-connectors"])
+        rendered = output.getvalue()
+        self.assertEqual(status, 0)
+        self.assertIn("offline-simulator:", rendered)
+        self.assertIn("bybit-testnet:", rendered)
+        self.assertIn("no live trading", rendered)
+
     def test_list_scenarios_is_human_readable(self) -> None:
         output = io.StringIO()
         with redirect_stdout(output):

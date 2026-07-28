@@ -1,7 +1,15 @@
 """Deterministic, offline trade-execution safety simulations."""
 
+from .conformance import (
+    ConformanceIssue,
+    ConformingVenue,
+    order_snapshot_issues,
+    order_transition_issues,
+    position_snapshot_issues,
+)
 from .engine import ExecutionPolicy, SafeExecutionEngine
 from .models import (
+    OFFLINE_SIMULATION_PROFILE,
     ExecutionReceipt,
     Fill,
     Instrument,
@@ -12,10 +20,14 @@ from .models import (
     PositionSnapshot,
     ReceiptOutcome,
     Side,
+    VenueSafetyProfile,
 )
 from .simulator import SimulatedOrderPlan, SimulatedVenue, SimulationStep
 
 __all__ = [
+    "OFFLINE_SIMULATION_PROFILE",
+    "ConformanceIssue",
+    "ConformingVenue",
     "ExecutionPolicy",
     "ExecutionReceipt",
     "Fill",
@@ -31,6 +43,10 @@ __all__ = [
     "SimulatedOrderPlan",
     "SimulatedVenue",
     "SimulationStep",
+    "VenueSafetyProfile",
+    "order_snapshot_issues",
+    "order_transition_issues",
+    "position_snapshot_issues",
 ]
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
