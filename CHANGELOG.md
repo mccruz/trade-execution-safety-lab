@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.1.0 — unreleased
+## 1.1.0 — 2026-07-28
 
 - Add reusable order, fill, transition, and position conformance checks.
 - Add an optional Bybit Testnet reference adapter built on the official
