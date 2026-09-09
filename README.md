@@ -1,25 +1,38 @@
 # Trade Execution Safety Lab
 
-An offline Python lab that tests how order automation handles failures,
-interruptions, and inconsistent provider data without using a live account or
-trading strategy.
+An offline Python lab for a concrete automation risk: a connection fails
+after an order is sent, and a retry could duplicate the action. The lab checks
+order and recovery behavior using a simulated provider and fictional orders.
+
+## Example result
+
+**Synthetic demo results:**
+
+| Situation | Result |
+| --- | --- |
+| Order fills while cancellation is in progress | Record the provider's final filled state |
+| Cancellation remains unresolved | Defer the unknown outcome for review |
+| Local and provider positions disagree | Block until reconciled |
+
+The offline demo generates a readable report for eight scenarios. Separate
+[restart tests](tests/test_receipts_restart.py) check recovery of an existing
+order rather than duplicate submission. These results establish selected
+engineering behavior, not profitability or production readiness.
+
+## My contribution
+
+I implemented the order checks, provider contract, simulated failure scenarios,
+restart handling, and checksummed receipts. The default lab uses no LLM, market
+data, account credentials, or trading strategy.
 
 ![Architecture of the offline trade execution safety workflow](assets/architecture.svg)
 
-## Review this project in 3 minutes
+<a id="review-this-project-in-3-minutes"></a>
 
-No account or installation is required:
+## Explore the project
 
-1. Scan the [failure scenarios](docs/scenarios.md).
-2. Read [How it works](#how-it-works) and
-   [Safety and limits](#safety-and-limits).
-3. Open the [architecture](docs/architecture.md) or
-   [automated checks](https://github.com/mccruz/trade-execution-safety-lab/actions)
-   for implementation evidence.
-
-The goal is not a trading result. The project shows how automation can reject
-unsafe work, compare its records with a provider, recover after interruption,
-and send uncertain outcomes to a person.
+Start with the example above, then follow the diagram and the
+[engineering evidence](#engineering-evidence). Setup is optional for review.
 
 ## How it works
 
@@ -64,6 +77,14 @@ is no mainnet option, live deployment command, or automatic environment switch.
 Public CI uses a fake injected client and never authenticates or sends an order.
 The [Testnet adapter guide](docs/connectors/bybit-testnet.md) documents the exact
 boundary and limitations.
+
+## Engineering evidence
+
+| Capability | Implementation | Check |
+| --- | --- | --- |
+| Handle fill/cancel uncertainty | [Engine](src/trade_execution_safety_lab/engine.py) | [Engine tests](tests/test_engine.py) |
+| Recover without duplicating an order | [Restart](src/trade_execution_safety_lab/restart.py) | [Restart tests](tests/test_receipts_restart.py) |
+| Reject conflicting provider state | [Reconciliation](src/trade_execution_safety_lab/reconciliation.py) | [Reconciliation tests](tests/test_reconciliation.py) |
 
 ## Optional offline demo
 
